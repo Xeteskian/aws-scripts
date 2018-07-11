@@ -19,6 +19,11 @@ aws_ip_ranges_url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
 
 
 def get_data():
+    """
+    Download the latest ip-ranges.json file from AWS and read it as json data
+    
+    :return: json data
+    """
     # set path to save the .json file to be the same as the one that the script runs from
     json_file = "{0}/aws_subnets.json".format(os.path.dirname(os.path.abspath(__file__)))
     try:
@@ -44,11 +49,24 @@ def get_data():
 
 
 def print_regions(data):
+    """
+    Parse & print json data for regions that AWS provides public ip subnet data for
+    
+    :param data: json; data in the form of their published ip-ranges.json file
+    :return: None
+    """
     region_set = set([entry["region"] for entry in data["prefixes"]])
     print(', '.join(region_set))
 
 
 def print_services(data, region=None):
+    """
+    Parse & print json data for service ip subnets, can optionally add a region to get that region's services
+     
+    :param data: json;  data in the form of their published ip-ranges.json file
+    :param region: string; region as per AWS' region names 
+    :return: None
+    """
     if not region:
         service_set = set([entry["service"] for entry in data["prefixes"]])
     else:
@@ -57,6 +75,14 @@ def print_services(data, region=None):
 
 
 def print_results(data, region=None, service=None):
+    """
+    Parse & print json data, output varies on optional region and service strings passed as args
+    
+    :param data: json;  data in the form of their published ip-ranges.json file
+    :param region: string; region as per AWS' region names 
+    :param service: string; service as noted by AWS  
+    :return: None
+    """
     for entry in data["prefixes"]:
         if not region:
             # No region specified, display all
@@ -72,10 +98,11 @@ def print_results(data, region=None, service=None):
 
 def main():
     """
-    Get all results
+    Parse command-line arguments and get results based on data provided
 
     :return: None
     """
+    # Setup parser and get arguments
     parser = argparse.ArgumentParser("Get public ip ranges with associated services for AWS.  "
                                      "Useful for building firewall policies")
     parser.add_argument("--list_regions",
@@ -89,7 +116,10 @@ def main():
     parser.add_argument("--service",
                         help="the service you wish to return the ip ranges for")
     args = parser.parse_args()
+    
+    # Get latest json data
     data = get_data()
+    
     if data:
         if args.list_regions:
             # print region list, ignores all other arguments
