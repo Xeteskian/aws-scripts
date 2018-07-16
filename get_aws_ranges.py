@@ -14,6 +14,7 @@ import time
 import os
 import json
 import argparse
+import ipaddress
 
 aws_ip_ranges_url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
 
@@ -21,7 +22,7 @@ aws_ip_ranges_url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
 def get_data():
     """
     Download the latest ip-ranges.json file from AWS and read it as json data
-    
+
     :return: json data
     """
     # set path to save the .json file to be the same as the one that the script runs from
@@ -51,7 +52,7 @@ def get_data():
 def print_regions(data):
     """
     Parse & print json data for regions that AWS provides public ip subnet data for
-    
+
     :param data: json; data in the form of their published ip-ranges.json file
     :return: None
     """
@@ -62,9 +63,9 @@ def print_regions(data):
 def print_services(data, region=None):
     """
     Parse & print json data for service ip subnets, can optionally add a region to get that region's services
-     
+
     :param data: json;  data in the form of their published ip-ranges.json file
-    :param region: string; region as per AWS' region names 
+    :param region: string; region as per AWS' region names
     :return: None
     """
     if not region:
@@ -74,13 +75,42 @@ def print_services(data, region=None):
     print(', '.join(service_set))
 
 
+def find_subnets(data, search_ip):
+    """
+    Parse & print json data for subnets, regions & services for a specific ip
+
+    :param data: json; data in the form of their published ip-ranges.json file
+    :param search_ip: string; ipv4 address
+    :return: None
+    """
+    try:
+        # set the ip address provided as an ipaddress object
+        ip = ipaddress.ip_address(search_ip)
+    except ValueError:
+        print('Error: IP address provided ({0})is not a valid ipv4 address.'.format(search_ip))
+        return None
+
+    # Search the json ip prefixes for the ip address, if the ip is within the subnet, add it to the results list
+    search_results = [entry for entry in data["prefixes"] if ip in ipaddress.ip_network(entry["ip_prefix"])]
+
+    if search_results:
+        # output the results
+        print("ip found in the following regions:")
+        for result in search_results:
+            print("Region: {0},  Service: {1},  Subnet: {2}".format(result["region"],
+                                                                    result["service"],
+                                                                    result["ip_prefix"],))
+    else:
+        print("ip not found in current AWS ip ranges")
+
+
 def print_results(data, region=None, service=None):
     """
     Parse & print json data, output varies on optional region and service strings passed as args
-    
+
     :param data: json;  data in the form of their published ip-ranges.json file
-    :param region: string; region as per AWS' region names 
-    :param service: string; service as noted by AWS  
+    :param region: string; region as per AWS' region names
+    :param service: string; service as noted by AWS
     :return: None
     """
     for entry in data["prefixes"]:
@@ -115,11 +145,13 @@ def main():
                         help="the region you wish to return the ip ranges for")
     parser.add_argument("--service",
                         help="the service you wish to return the ip ranges for")
+    parser.add_argument("--findip",
+                        help="search for the region, service and subnet an ip address belongs to")
     args = parser.parse_args()
-    
+
     # Get latest json data
     data = get_data()
-    
+
     if data:
         if args.list_regions:
             # print region list, ignores all other arguments
@@ -127,6 +159,9 @@ def main():
         elif args.list_services:
             # print service list, ignores the --service optional argument
             print_services(data, region=args.region)
+        elif args.findip:
+            # search for the region, service and subnet an ip belongs to
+            find_subnets(data, args.findip)
         else:
             # print ip ranges
             print_results(data, region=args.region, service=args.service)
